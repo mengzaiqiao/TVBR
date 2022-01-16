@@ -14,7 +14,7 @@
         "k": [5,10,20],
         "valid_metric": "ndcg",
         "valid_k": 10,
-        "result_file": "ncf_result.csv",
+        "result_file": "userKNN_result.csv",
         "save_mode": "average"
     },
     "dataset": {
@@ -29,37 +29,23 @@
         "result_col": ["dataset","data_split","test_rate","n_negative"]
     },
     "model": {
-        "model": "ncf_end",
+        "model": "userKNN",
         "config_id": "default",
-        "emb_dim": 32,
-        "num_negative": 5,
-        "lr": 1e-3,
-        "alpha": 0.001,
-        "batch_size": 512,
+        "emb_dim": 0,
+        "num_negative": 4,
+        "batch_size": 0,
         "batch_eval": true,
         "dropout": 0.0,
-        "optimizer": "adam",
-        "l2_regularization": 0.01,
-        "max_epoch": 200,
+        "optimizer": "None",
+        "loss": "None",
+        "lr": 0.0,
+        "reg": 0.0,
+        "max_epoch": 1,
         "max_n_update": 20,
-        "gmf_config": {
-            "name": "gmf",
-            "save_name": "gmf.model"
-        },
-        "mlp_config": {
-            "name": "mlp",
-            "n_layers": 3,
-            "save_name": "mlp.model"
-        },
-        "neumf_config": {
-            "name": "ncf",
-            "save_name": "ncf.model"
-        },
-        "save_name": "ncf.model",
-        "result_col": ["model","emb_dim","batch_size","optimizer","lr"]
+        "neighbourhood_size": 100,
+        "save_name": "userKNN.model",
+        "result_col": ["model","emb_dim","batch_size","dropout","optimizer","loss","lr","reg"]
     },
     "tunable": [
-        {"name": "lr", "type": "choice", "values": [0.0005,0.00025]}
     ]
 }
-

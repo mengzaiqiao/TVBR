@@ -4,7 +4,7 @@ import pandas as pd
 
 from ..data.auxiliary_data import Auxiliary
 from ..data.base_data import BaseData
-from ..utils.common_util import ensureDir
+from ..utils.common_util import ensureDir, timeit
 from ..utils.triple_sampler import Sampler
 
 pd.options.mode.chained_assignment = None  # default='warn'

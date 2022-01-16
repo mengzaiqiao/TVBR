@@ -61,6 +61,25 @@ We also provide docker image for you to run this project on any platform. You ca
    
 4. Enter `root` as the password for the notebook.
 
+### Install from local
+
+Install Beta-RecSys using setup.py from github
+Install Anaconda with Python >= 3.6. Miniconda is a quick way to get started.
+
+Install and record the installed files
+```shell
+git clone https://github.com/beta-team/beta-recsys.git
+cd $project_path$
+python setup.py install --record files.txt
+```
+Uninstall Beta-RecSys completely
+To uninstall the Beta-RecSys
+
+```shell
+cd $project_path$
+xargs rm -rf < files.txt
+```
+
 ## Quick Start
 
 ### Downloading and Splitting Datasets
@@ -136,6 +155,9 @@ The following is a list of recommender models currently available in the reposit
 |LightGCN|[**LightGCN**: Simplifying and Powering Graph Convolution Network for Recommendation](https://arxiv.org/abs/2002.02126), SIGIR 2020|[![Example In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/118SkZ3mpG6gBzOgeVTs8_jVYBd4k8pOa?usp=sharing)|
 |LCF|[Graph Convolutional Network for Recommendation with Low-pass Collaborative Filters](https://arxiv.org/abs/2006.15516)||
 |VAECF|[Variational autoencoders for collaborative filtering](https://dl.acm.org/doi/abs/10.1145/3178876.3186150), WWW 2018||
+|UserKNN|User-based K-Nearest Neighbour Recommender in [Factorization Meets the Neighborhood: a Multifaceted Collaborative Filtering](https://dl.acm.org/doi/10.1145/1401890.1401944), KDD 2008||
+|ItemKNN|Item-based K-Nearest Neighbour Recommender in [Item-Based Collaborative Filtering Recommendation](https://dl.acm.org/doi/10.1145/371920.372071), WWW 2001||
+|MixGCF| [MixGCF: An Improved Training Method for Graph Neural Network-based Recommender Systems](http://keg.cs.tsinghua.edu.cn/jietang/publications/KDD21-Huang-et-al-MixGCF.pdf), KDD 2021||
 
 ### Sequential Models
 |Model|Paper|Colab|
@@ -155,7 +177,7 @@ The following is a list of recommender models currently available in the reposit
 |------|------|------|
 |Triple2vec|[Representing and recommending shopping baskets with complementarity, compatibility and loyalty](https://dl.acm.org/doi/abs/10.1145/3269206.3271786), CIKM 2018|[![Example In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/10utuVzOjsLzj2XqWUxXgZrqgEe5azv3B?usp=sharing)|
 |VBCAR|[Variational Bayesian Context-aware Representation for Grocery Recommendation](https://arxiv.org/abs/1909.07705),  arXiv’ 2019|[![Example In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1gOW4-TVZ-Ub1fIQROcwRh1dziI86JshZ?usp=sharing)|
-|T-VBR|||
+|TVBR|Temporal Variational Bayesian Representation Learning for Grocery Recommendation|[![Example In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1H3QU56YSrqKrqEwj_1_eYltBIA9WqB_R?usp=sharing)|
   ### Knowledge Graph
   - [ ] KGAT: [Kgat: Knowledge graph attention network for recommendation](https://dl.acm.org/doi/abs/10.1145/3292500.3330989). SIGKDD 2019
 

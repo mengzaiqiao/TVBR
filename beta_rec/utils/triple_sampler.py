@@ -16,7 +16,7 @@ from ..utils.constants import (
 class Sampler(object):
     """Sampler Class."""
 
-    def __init__(self, df_train, sample_file, n_sample, dump=True, load_save=False):
+    def __init__(self, df_train, sample_file, n_sample, dump=True, load_save=True):
         """Init Sampler Class."""
         self.sample_file = sample_file
         self.df_train = df_train
@@ -116,8 +116,7 @@ class Sampler(object):
                 index_start = 0
                 index_end = rest_baskets
             sampled_index = np.random.choice(
-                np.arange(index_start, index_end),
-                size=n_sample_per_t,
+                np.arange(index_start, index_end), size=n_sample_per_t,
             )
             sampled_order = self.dataTrain.iloc[sampled_index]
             for _, row in sampled_order.iterrows():

@@ -161,11 +161,7 @@ class Instacart_25(DatasetBase):
     """
 
     def __init__(
-        self,
-        dataset_name="instacart_25",
-        min_u_c=0,
-        min_i_c=3,
-        min_o_c=0,
+        self, dataset_name="instacart_25", min_u_c=0, min_i_c=3, min_o_c=0,
     ):
         """Init Instacart_25 Class."""
         super().__init__(
@@ -201,15 +197,13 @@ class Instacart_25(DatasetBase):
         order_products_train_file = os.path.join(
             self.raw_path, "order_products__train.csv"
         )
+        orders_file = os.path.join(self.raw_path, "orders.csv")
+
         if not os.path.exists(order_products_prior_file) or not os.path.exists(
             order_products_train_file
         ):
             print("Raw file doesn't exist, try to download it.")
             self.download()
-            file_name = os.path.join(self.raw_path + ".gz")
-            un_zip(file_name)
-
-        orders_file = os.path.join(self.raw_path, "orders.csv")
 
         #  order_products__*.csv: order_id,product_id,add_to_cart_order,reordered
         prior_products = pd.read_csv(

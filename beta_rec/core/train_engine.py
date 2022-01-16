@@ -12,12 +12,20 @@ from ray import tune
 from tabulate import tabulate
 from tqdm import tqdm
 
+import wandb
+
 from ..core.config import find_config
 from ..core.eval_engine import EvalEngine
 from ..data.base_data import BaseData
 from ..datasets.data_load import load_split_dataset
 from ..utils import logger
-from ..utils.common_util import ensureDir, print_dict_as_table, set_seed, update_args
+from ..utils.common_util import (
+    ensureDir,
+    print_dict_as_table,
+    set_seed,
+    timeit,
+    update_args,
+)
 
 
 class TrainEngine(object):
@@ -31,6 +39,8 @@ class TrainEngine(object):
         self.engine = None
         self.args = args
         self.config = self.prepare_env()
+        wandb.init(sync_tensorboard=True, project=self.config["model"]["model"])
+        wandb.config.update(self.config)
         self.gpu_id, self.config["model"]["device_str"] = self.get_device()
         self.eval_engine = EvalEngine(self.config)
 
@@ -40,33 +50,40 @@ class TrainEngine(object):
         Returns:
             (int, str): The gpu id (None if no available gpu) and the the device string (pytorch style).
         """
+        print(os.system("nvidia-smi"))
         if "device" in self.config["system"]:
             if self.config["system"]["device"] == "cpu":
                 return (None, "cpu")
             elif (
                 "cuda" in self.config["system"]["device"]
             ):  # receive an string with "cuda:#"
-                return (
-                    int(self.config["system"]["device"].replace("cuda", "")),
-                    self.config["system"]["device"],
+                gpu_id = int(
+                    self.config["system"]["device"]
+                    .replace("cuda:", "")
+                    .replace("cuda", "")
                 )
+                device_str = "cuda:" + str(gpu_id)
+                print("Get a gpu id from args:", gpu_id)
+                return gpu_id, device_str
             elif len(self.config["system"]["device"]) == 1:  # receive an gpu id
-                return (
-                    int(self.config["system"]["device"]),
-                    "cuda:" + self.config["system"]["device"],
-                )
+                gpu_id = int(self.config["system"]["device"])
+                device_str = "cuda:" + str(gpu_id)
+                print("Get a gpu id from args:", gpu_id)
+                return gpu_id, device_str
+
         device_str = "cpu"
         gpu_id_list = GPUtil.getAvailable(
-            order="memory", limit=3
+            order="memory", limit=4
         )  # get the fist gpu with the lowest load
         if len(gpu_id_list) < 1:
             gpu_id = None
             device_str = "cpu"
+            print("Find len(gpu_id_list) < 1, set device: ", device_str)
         else:
             gpu_id = gpu_id_list[0]
             # need to set 0 if ray only specify 1 gpu
             if "CUDA_VISIBLE_DEVICES" in os.environ:
-                if len(os.environ["CUDA_VISIBLE_DEVICES"].split()) == 1:
+                if len(os.environ["CUDA_VISIBLE_DEVICES"].split(",")) == 1:
                     #  gpu_id = int(os.environ["CUDA_VISIBLE_DEVICES"])
                     gpu_id = 0
                     print("Find only one gpu with id: ", gpu_id)
@@ -130,7 +147,7 @@ class TrainEngine(object):
         logger.init_std_logger(config["system"]["log_file"])
 
         print("Python version:", sys.version)
-        print("pytorch version:", torch.__version__)
+        print("Pytorch version:", torch.__version__)
 
         #  File paths to be saved
         config["model"]["run_dir"] = os.path.join(
@@ -222,7 +239,9 @@ class TrainEngine(object):
             return True
         return False
 
-    def _train(self, engine, train_loader, save_dir, valid_df=None, test_df=None):
+    def _train(
+        self, engine, train_loader, save_dir, valid_df=None, test_df=None, skip_epoch=40
+    ):
         self.eval_engine.flush()
         epoch_bar = tqdm(range(self.config["model"]["max_epoch"]), file=sys.stdout)
         for epoch in epoch_bar:
@@ -232,12 +251,13 @@ class TrainEngine(object):
                 break
             engine.train_an_epoch(train_loader, epoch_id=epoch)
             """evaluate model on validation and test sets"""
-            if (valid_df is None) & (test_df is None):
-                self.eval_engine.train_eval(
-                    self.data.valid[0], self.data.test[0], engine.model, epoch
-                )
-            else:
-                self.eval_engine.train_eval(valid_df, test_df, engine.model, epoch)
+            if epoch >= skip_epoch:
+                if (valid_df is None) & (test_df is None):
+                    self.eval_engine.train_eval(
+                        self.data.valid[0], self.data.test[0], engine.model, epoch
+                    )
+                else:
+                    self.eval_engine.train_eval(valid_df, test_df, engine.model, epoch)
 
     def _seq_train(
         self, engine, train_loader, save_dir, train_seq, valid_df=None, test_df=None
@@ -340,23 +360,11 @@ class TrainEngine(object):
         print(tabulate(df, headers=df.columns, tablefmt="psql"))
         return df
 
-    # def ax_tune(self, runable):
-    #     # todo still cannot runable yet.
-    #     ax = AxClient(enforce_sequential_optimization=False)
-    #     # verbose_logging=False,
-    #     ax.create_experiment(
-    #         name=self.config["model"]["model"],
-    #         parameters=self.config["tunable"],
-    #         objective_name="valid_metric",
-    #     )
-    #     tune.run(
-    #         runable,
-    #         num_samples=30,
-    #         search_alg=AxSearch(ax),  # Note that the argument here is the `AxClient`.
-    #         verbose=2,  # Set this level to 1 to see status updates and to 2 to also see trial results.
-    #         # To use GPU, specify: resources_per_trial={"gpu": 1}.
-    #     )
-
     def test(self):
-        """Evaluate the performance for the testing sets based on the final model."""
-        self.eval_engine.test_eval(self.data.test, self.engine.model)
+        """Evaluate the performance for the testing sets based on the best performing model."""
+        model_save_dir = os.path.join(
+            self.config["system"]["model_save_dir"], self.config["model"]["save_name"]
+        )
+        model = self.engine.resume_checkpoint(model_save_dir)
+        self.eval_engine.test_eval(self.data.test, model)
+

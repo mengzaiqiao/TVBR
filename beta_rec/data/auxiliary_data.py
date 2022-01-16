@@ -1,7 +1,7 @@
 import numpy as np
 
 from ..datasets.data_load import load_item_fea_dic
-from ..utils.common_util import get_random_rep
+from ..utils.common_util import get_random_rep, timeit
 
 
 class Auxiliary(object):
@@ -12,6 +12,7 @@ class Auxiliary(object):
 
     """
 
+    @timeit
     def __init__(self, config, n_users, n_items):
         """Initialize Auxiliary Class."""
         self.config = config
@@ -31,8 +32,14 @@ class Auxiliary(object):
             fea_type = config["dataset"]["item_fea_type"]
         else:
             fea_type = "random"
+
         if fea_type == "random":
             self.item_feature = get_random_rep(self.n_items, self.random_dim)
+        elif fea_type == "cate":
+            item_fea_dic = load_item_fea_dic(config, fea_type="cate")
+            self.item_feature = np.array(
+                [item_fea_dic[self.id2item[k]] for k in np.arange(self.n_items)]
+            )
         elif fea_type == "one_hot":
             item_fea_dic = load_item_fea_dic(config, fea_type="one_hot")
             self.item_feature = np.array(
@@ -48,7 +55,7 @@ class Auxiliary(object):
             self.item_feature = np.array(
                 [item_fea_dic[self.id2item[k]] for k in np.arange(self.n_items)]
             )
-        elif fea_type == "random_one_hot" or fea_type == "one_hot_random":
+        elif fea_type == "random_one_hot":
             rand_item_fea = get_random_rep(self.n_items, 512)
             item_fea_dic = load_item_fea_dic(config, fea_type="one_hot")
             item_fea_list = np.array(
@@ -76,8 +83,8 @@ class Auxiliary(object):
                 [item_fea_dic[self.id2item[k]] for k in np.arange(self.n_items)]
             )
             self.item_feature = np.concatenate((item_fea_list, rand_item_fea), axis=1)
-        elif fea_type == "word2vec_one_hot" or fea_type == "one_hot_word2vec":
-            item_fea_dic1 = load_item_fea_dic(config, fea_type="one_hot")
+        elif fea_type == "cate_word2vec":
+            item_fea_dic1 = load_item_fea_dic(config, fea_type="cate")
             item_fea_dic2 = load_item_fea_dic(config, fea_type="word2vec")
             item_fea_list1 = np.array(
                 [item_fea_dic1[self.id2item[k]] for k in np.arange(self.n_items)]
@@ -86,14 +93,29 @@ class Auxiliary(object):
                 [item_fea_dic2[self.id2item[k]] for k in np.arange(self.n_items)]
             )
             self.item_feature = np.concatenate((item_fea_list1, item_fea_list2), axis=1)
-        elif (
-            fea_type == "word2vec_one_hot_random"
-            or fea_type == "random_one_hot_word2vec"
-            or fea_type == "one_hot_random_word2vec"
-            or fea_type == "random_word2vec_one_hot"
-        ):
+        elif fea_type == "cate_bert":
+            item_fea_dic1 = load_item_fea_dic(config, fea_type="cate")
+            item_fea_dic2 = load_item_fea_dic(config, fea_type="bert")
+            item_fea_list1 = np.array(
+                [item_fea_dic1[self.id2item[k]] for k in np.arange(self.n_items)]
+            )
+            item_fea_list2 = np.array(
+                [item_fea_dic2[self.id2item[k]] for k in np.arange(self.n_items)]
+            )
+            self.item_feature = np.concatenate((item_fea_list1, item_fea_list2), axis=1)
+        elif fea_type == "cate_one_hot":
+            item_fea_dic1 = load_item_fea_dic(config, fea_type="cate")
+            item_fea_dic2 = load_item_fea_dic(config, fea_type="one_hot")
+            item_fea_list1 = np.array(
+                [item_fea_dic1[self.id2item[k]] for k in np.arange(self.n_items)]
+            )
+            item_fea_list2 = np.array(
+                [item_fea_dic2[self.id2item[k]] for k in np.arange(self.n_items)]
+            )
+            self.item_feature = np.concatenate((item_fea_list1, item_fea_list2), axis=1)
+        elif fea_type == "random_cate_word2vec":
             rand_item_fea = get_random_rep(self.n_items, 512)
-            item_fea_dic1 = load_item_fea_dic(config, fea_type="one_hot")
+            item_fea_dic1 = load_item_fea_dic(config, fea_type="cate")
             item_fea_dic2 = load_item_fea_dic(config, fea_type="word2vec")
             item_fea_list1 = np.array(
                 [item_fea_dic1[self.id2item[k]] for k in np.arange(self.n_items)]
@@ -104,38 +126,38 @@ class Auxiliary(object):
             self.item_feature = np.concatenate(
                 (item_fea_list1, item_fea_list2, rand_item_fea), axis=1
             )
-        elif (
-            fea_type == "word2vec_one_hot_bert"
-            or fea_type == "bert_one_hot_word2vec"
-            or fea_type == "one_hot_bert_word2vec"
-        ):
-            item_fea_dic1 = load_item_fea_dic(config, fea_type="one_hot")
-            item_fea_dic2 = load_item_fea_dic(config, fea_type="word2vec")
-            item_fea_dic3 = load_item_fea_dic(config, fea_type="bert")
-            item_fea_list1 = np.array(
-                [item_fea_dic1[self.id2item[k]] for k in np.arange(self.n_items)]
-            )
-            item_fea_list2 = np.array(
-                [item_fea_dic2[self.id2item[k]] for k in np.arange(self.n_items)]
-            )
-            item_fea_list3 = np.array(
-                [item_fea_dic3[self.id2item[k]] for k in np.arange(self.n_items)]
-            )
-            self.item_feature = np.concatenate(
-                (item_fea_list1, item_fea_list2, item_fea_list3), axis=1
-            )
-        elif (
-            fea_type == "random_word2vec_one_hot_bert"
-            or fea_type == "bert_one_hot_word2vec_random"
-            or fea_type == "one_hot_random_bert_word2vec"
-            or fea_type == "one_hot_bert_random_word2vec"
-            or fea_type == "one_hot_word2vec_bert_random"
-            or fea_type == "random_one_hot_word2vec_bert"
-        ):
+        elif fea_type == "random_cate_bert":
             rand_item_fea = get_random_rep(self.n_items, 512)
-            item_fea_dic1 = load_item_fea_dic(config, fea_type="one_hot")
-            item_fea_dic2 = load_item_fea_dic(config, fea_type="word2vec")
-            item_fea_dic3 = load_item_fea_dic(config, fea_type="bert")
+            item_fea_dic1 = load_item_fea_dic(config, fea_type="cate")
+            item_fea_dic2 = load_item_fea_dic(config, fea_type="bert")
+            item_fea_list1 = np.array(
+                [item_fea_dic1[self.id2item[k]] for k in np.arange(self.n_items)]
+            )
+            item_fea_list2 = np.array(
+                [item_fea_dic2[self.id2item[k]] for k in np.arange(self.n_items)]
+            )
+            self.item_feature = np.concatenate(
+                (item_fea_list1, item_fea_list2, rand_item_fea), axis=1
+            )
+        elif fea_type == "random_cate_one_hot":
+            rand_item_fea = get_random_rep(self.n_items, 512)
+            item_fea_dic1 = load_item_fea_dic(config, fea_type="cate")
+            item_fea_dic2 = load_item_fea_dic(config, fea_type="one_hot")
+            item_fea_list1 = np.array(
+                [item_fea_dic1[self.id2item[k]] for k in np.arange(self.n_items)]
+            )
+            item_fea_list2 = np.array(
+                [item_fea_dic2[self.id2item[k]] for k in np.arange(self.n_items)]
+            )
+            self.item_feature = np.concatenate(
+                (item_fea_list1, item_fea_list2, rand_item_fea), axis=1
+            )
+        elif fea_type == "random_cate_bert_word2vec_one_hot":
+            rand_item_fea = get_random_rep(self.n_items, 512)
+            item_fea_dic1 = load_item_fea_dic(config, fea_type="cate")
+            item_fea_dic2 = load_item_fea_dic(config, fea_type="one_hot")
+            item_fea_dic3 = load_item_fea_dic(config, fea_type="word2vec")
+            item_fea_dic4 = load_item_fea_dic(config, fea_type="bert")
             item_fea_list1 = np.array(
                 [item_fea_dic1[self.id2item[k]] for k in np.arange(self.n_items)]
             )
@@ -145,8 +167,11 @@ class Auxiliary(object):
             item_fea_list3 = np.array(
                 [item_fea_dic3[self.id2item[k]] for k in np.arange(self.n_items)]
             )
+            item_fea_list4 = np.array(
+                [item_fea_dic4[self.id2item[k]] for k in np.arange(self.n_items)]
+            )
             self.item_feature = np.concatenate(
-                (item_fea_list1, item_fea_list2, item_fea_list3, rand_item_fea), axis=1
+                (item_fea_list1, item_fea_list2, item_fea_list3, item_fea_list4), axis=1
             )
         else:
             print(

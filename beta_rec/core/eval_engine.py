@@ -10,6 +10,8 @@ import torch
 from tensorboardX import SummaryWriter
 from tqdm.autonotebook import tqdm
 
+import wandb
+
 from ..utils import evaluation as eval_model
 from ..utils.common_util import print_dict_as_table, save_to_csv, timeit
 from ..utils.constants import (
@@ -106,10 +108,14 @@ def train_eval_worker(testEngine, valid_df, test_df, valid_pred, test_pred, epoc
     valid_result = evaluate(
         valid_df, valid_pred, testEngine.metrics, testEngine.valid_k
     )
-    test_result = evaluate(test_df, test_pred, testEngine.metrics, testEngine.valid_k)
+    if test_df:
+        test_result = evaluate(
+            test_df, test_pred, testEngine.metrics, testEngine.valid_k
+        )
+        testEngine.record_performance(valid_result, test_result, epoch)
+    else:
+        testEngine.record_performance(valid_result, None, epoch)
     lock_train_eval.acquire()
-    testEngine.record_performance(valid_result, test_result, epoch)
-    testEngine.expose_performance(valid_result, test_result)
     if (
         valid_result[f"{testEngine.valid_metric}@{testEngine.valid_k}"]
         > testEngine.best_valid_performance
@@ -127,11 +133,12 @@ def train_eval_worker(testEngine, valid_df, test_df, valid_pred, test_pred, epoc
             tag=f"performance on validation at epoch {epoch}",
             columns=["metrics", "values"],
         )
-        print_dict_as_table(
-            test_result,
-            tag=f"performance on testing at epoch {epoch}",
-            columns=["metrics", "values"],
-        )
+        if test_df:
+            print_dict_as_table(
+                test_result,
+                tag=f"performance on testing at epoch {epoch}",
+                columns=["metrics", "values"],
+            )
     else:
         testEngine.n_no_update += 1
         print(f"number of epochs that have no update {testEngine.n_no_update}")
@@ -139,7 +146,10 @@ def train_eval_worker(testEngine, valid_df, test_df, valid_pred, test_pred, epoc
     testEngine.n_worker -= 1
     lock_train_eval.release()
     # lock record and get best performance
-    return valid_result, test_result
+    if test_df:
+        return valid_result, test_result
+    else:
+        return valid_result, None
 
 
 @timeit
@@ -161,9 +171,7 @@ def test_eval_worker(testEngine, eval_data_df, prediction):
         eval_data_df, prediction, testEngine.metrics, testEngine.k
     )
     print_dict_as_table(
-        test_result_dic,
-        tag="performance on test",
-        columns=["metrics", "values"],
+        test_result_dic, tag="performance on test", columns=["metrics", "values"],
     )
     test_result_dic.update(result_para)
     lock_test_eval.acquire()  # need to be test
@@ -199,7 +207,7 @@ class EvalEngine(object):
         self.valid_metric = config["system"]["valid_metric"]
         self.valid_k = config["system"]["valid_k"]
         self.batch_eval = (
-            config["model"]["batch_eval"] if "batch_eval" in config else False
+            config["model"]["batch_eval"] if "batch_eval" in config else True
         )
         self.batch_size = config["model"]["batch_size"]
         self.writer = SummaryWriter(
@@ -229,7 +237,7 @@ class EvalEngine(object):
         self.n_no_update = 0
         self.best_valid_performance = 0
 
-    def predict(self, data_df, model, batch_eval=False):
+    def predict(self, data_df, model, batch_eval=True):
         """Make prediction for a trained model.
 
         Args:
@@ -296,11 +304,7 @@ class EvalEngine(object):
                     idx -= 1
                     if idx == -1:
                         break
-                score = model.predict(
-                    np.array([u]),
-                    np.array([seq]),
-                    np.array(items),
-                )
+                score = model.predict(np.array([u]), np.array([seq]), np.array(items),)
                 score = np.array(
                     score.flatten().to(torch.device("cpu")).detach().numpy() * -1
                 )
@@ -355,11 +359,7 @@ class EvalEngine(object):
                     idx -= 1
                     if idx == -1:
                         break
-                score = model.predict(
-                    np.array([u]),
-                    np.array([seq]),
-                    np.array(items),
-                )
+                score = model.predict(np.array([u]), np.array([seq]), np.array(items),)
                 score = np.array(
                     score.flatten().to(torch.device("cpu")).detach().numpy() * -1
                 )
@@ -495,18 +495,24 @@ class EvalEngine(object):
             k (int or list): top k result to be evaluate.
         """
         valid_pred = self.predict(valid_data_df, model, self.batch_eval)
-        test_pred = self.predict(test_data_df, model, self.batch_eval)
-        worker = Thread(
-            target=train_eval_worker,
-            args=(
-                self,
-                valid_data_df,
-                test_data_df,
-                valid_pred,
-                test_pred,
-                epoch_id,
-            ),
-        )
+        if test_data_df:
+            test_pred = self.predict(test_data_df, model, self.batch_eval)
+            worker = Thread(
+                target=train_eval_worker,
+                args=(
+                    self,
+                    valid_data_df,
+                    test_data_df,
+                    valid_pred,
+                    test_pred,
+                    epoch_id,
+                ),
+            )
+        else:
+            worker = Thread(
+                target=train_eval_worker,
+                args=(self, valid_data_df, None, valid_pred, None, epoch_id,),
+            )
         worker.start()
 
     def seq_train_eval(
@@ -527,14 +533,7 @@ class EvalEngine(object):
         )
         worker = Thread(
             target=train_eval_worker,
-            args=(
-                self,
-                valid_data_df,
-                test_data_df,
-                valid_pred,
-                test_pred,
-                epoch_id,
-            ),
+            args=(self, valid_data_df, test_data_df, valid_pred, test_pred, epoch_id,),
         )
         worker.start()
 
@@ -566,14 +565,7 @@ class EvalEngine(object):
         )
         worker = Thread(
             target=train_eval_worker,
-            args=(
-                self,
-                valid_data_df,
-                test_data_df,
-                valid_pred,
-                test_pred,
-                epoch_id,
-            ),
+            args=(self, valid_data_df, test_data_df, valid_pred, test_pred, epoch_id,),
         )
         worker.start()
 
@@ -606,15 +598,35 @@ class EvalEngine(object):
             test_result (dict): Performance result of testing set.
             epoch_id (int): epoch_id.
         """
+        performance_dict = {}
         for metric in self.metrics:
-            self.writer.add_scalars(
-                "performance/" + metric,
-                {
-                    "valid": valid_result[f"{metric}@{self.valid_k}"],
-                    "test": test_result[f"{metric}@{self.valid_k}"],
-                },
-                epoch_id,
-            )
+            if test_result:
+                self.writer.add_scalars(
+                    "performance/" + metric,
+                    {
+                        "valid": valid_result[f"{metric}@{self.valid_k}"],
+                        "test": test_result[f"{metric}@{self.valid_k}"],
+                    },
+                    epoch_id,
+                )
+                performance_dict[f"valid_{metric}@{self.valid_k}"] = valid_result[
+                    f"{metric}@{self.valid_k}"
+                ]
+                performance_dict[f"test_{metric}@{self.valid_k}"] = test_result[
+                    f"{metric}@{self.valid_k}"
+                ]
+            else:
+                self.writer.add_scalars(
+                    "performance/" + metric,
+                    {"valid": valid_result[f"{metric}@{self.valid_k}"],},
+                    epoch_id,
+                )
+                performance_dict[f"valid_{metric}@{self.valid_k}"] = valid_result[
+                    f"{metric}@{self.valid_k}"
+                ]
+
+        performance_dict["epoch"] = epoch_id
+        wandb.log(performance_dict)
 
 
 class SeqEvalEngine(object):
@@ -700,14 +712,7 @@ class SeqEvalEngine(object):
         return metrics / len(test_sequences)
 
     def evaluate_sequence(
-        self,
-        recommender,
-        seq,
-        evaluation_functions,
-        user,
-        given_k,
-        look_ahead,
-        top_n,
+        self, recommender, seq, evaluation_functions, user, given_k, look_ahead, top_n,
     ):
         """Compute metrics for each sequence.
 
@@ -782,13 +787,7 @@ class SeqEvalEngine(object):
         eval_cnt = 0
         for gk in range(given_k, len(seq), step):
             eval_res += self.evaluate_sequence(
-                recommender,
-                seq,
-                evaluation_functions,
-                user,
-                gk,
-                look_ahead,
-                top_n,
+                recommender, seq, evaluation_functions, user, gk, look_ahead, top_n,
             )
             eval_cnt += 1
         return eval_res / eval_cnt
